@@ -1,26 +1,221 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>SmartAssist Admin</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><div class="app"><header><h1>🛠 SmartAssist Admin</h1><a href="/">Chat</a></header>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartAssist Admin</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+<div class="app">
+
+<header>
+    <h1>🛠 SmartAssist Admin</h1>
+    <a href="/">Chat</a>
+</header>
+
 <main>
+
 <h2>Knowledge Base</h2>
 <div id="articles"></div>
+
 <hr>
-<h2>Add Article</h2>
-<input id="filename" placeholder="article_name">
-<textarea id="content" rows="12" style="width:100%;margin:12px 0;padding:12px" placeholder="# Article title&#10;&#10;Question: ...&#10;Answer: ..."></textarea>
-<button onclick="addArticle()">Add / Update Article</button>
-<h2>Recent Conversations</h2><pre id="logs"></pre>
-</main></div>
+
+<h2>Add / Edit Article</h2>
+
+<input id="filename"
+       placeholder="article_name.md"
+       style="width:100%;padding:10px">
+
+<textarea id="content"
+          rows="12"
+          style="width:100%;margin:12px 0;padding:12px"
+          placeholder="# Article title&#10;&#10;Question: ...&#10;Answer: ..."></textarea>
+
+<button onclick="saveArticle()">Save Article</button>
+<button onclick="clearForm()">Clear</button>
+
+<hr>
+
+<h2>Recent Conversations</h2>
+<pre id="logs"></pre>
+
+<hr>
+
+<h2>Feedback</h2>
+<pre id="feedback"></pre>
+
+<hr>
+
+<h2>Statistics</h2>
+<pre id="stats"></pre>
+
+</main>
+</div>
+
 <script>
-async function load(){
- const k=await (await fetch("/admin/knowledge")).json();
- document.getElementById("articles").innerHTML=k.articles.map(a=>`<div class="bubble assistant"><b>${a.filename}</b></div>`).join("");
- const c=await (await fetch("/admin/conversations")).json();
- document.getElementById("logs").textContent=JSON.stringify(c.rows,null,2);
+
+let editingFilename = "";
+
+async function load() {
+
+    const k = await (await fetch("/admin/knowledge")).json();
+
+    document.getElementById("articles").innerHTML =
+        k.articles.map(a => `
+            <div class="bubble assistant">
+                <b>${a.filename}</b><br><br>
+                <button onclick="editArticle('${a.filename}')">
+                    Edit
+                </button>
+                <button onclick="deleteArticle('${a.filename}')">
+                    Delete
+                </button>
+            </div>
+        `).join("");
+
+    const c = await (await fetch("/admin/conversations")).json();
+    document.getElementById("logs").textContent =
+        JSON.stringify(c.rows, null, 2);
+
+    const f = await (await fetch("/admin/feedback")).json();
+    document.getElementById("feedback").textContent =
+        JSON.stringify(f.rows, null, 2);
+
+    const s = await (await fetch("/admin/stats")).json();
+    document.getElementById("stats").textContent =
+        JSON.stringify(s, null, 2);
 }
-async function addArticle(){
- await fetch("/admin/knowledge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:document.getElementById("filename").value,content:document.getElementById("content").value})});
- alert("Knowledge base updated"); load();
+
+
+async function editArticle(filename) {
+
+    const r = await fetch("/admin/knowledge");
+    const data = await r.json();
+
+    const article = data.articles.find(
+        a => a.filename === filename
+    );
+
+    if (!article) return;
+
+    editingFilename = filename;
+
+    document.getElementById("filename").value =
+        article.filename;
+
+    document.getElementById("content").value =
+        article.content;
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
 }
+
+
+async function saveArticle() {
+
+    const filename =
+        document.getElementById("filename").value.trim();
+
+    const content =
+        document.getElementById("content").value.trim();
+
+    if (!filename || !content) {
+        alert("Filename and content are required.");
+        return;
+    }
+
+    let response;
+
+    if (editingFilename) {
+
+        response = await fetch(
+            "/admin/knowledge/" +
+            encodeURIComponent(editingFilename),
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    filename: filename,
+                    content: content
+                })
+            }
+        );
+
+    } else {
+
+        response = await fetch(
+            "/admin/knowledge",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    filename: filename,
+                    content: content
+                })
+            }
+        );
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+        alert(result.detail || "Operation failed.");
+        return;
+    }
+
+    alert("Article saved successfully.");
+
+    clearForm();
+    load();
+}
+
+
+async function deleteArticle(filename) {
+
+    if (!confirm(
+        "Delete " + filename + "?"
+    )) return;
+
+    const response = await fetch(
+        "/admin/knowledge/" +
+        encodeURIComponent(filename),
+        {
+            method: "DELETE"
+        }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+        alert(result.detail || "Delete failed.");
+        return;
+    }
+
+    alert("Article deleted.");
+    load();
+}
+
+
+function clearForm() {
+
+    editingFilename = "";
+
+    document.getElementById("filename").value = "";
+    document.getElementById("content").value = "";
+}
+
+
 load();
-</script></body></html>
+
+</script>
+
+</body>
+</html>

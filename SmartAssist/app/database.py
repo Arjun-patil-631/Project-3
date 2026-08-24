@@ -54,3 +54,15 @@ def all_conversations(limit=100):
             "SELECT session_id,role,message,intent,created_at FROM conversations ORDER BY id DESC LIMIT ?",
             (limit,)
         ).fetchall()
+
+def all_feedback(limit=100):
+    with sqlite3.connect(DB_PATH) as conn:
+        return conn.execute(
+            """
+            SELECT id, session_id, rating, comment, created_at
+            FROM feedback
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
