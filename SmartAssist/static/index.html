@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartAssist</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>🤖 SmartAssist</h1>
+      <p>AI-Powered Customer Support</p>
+    </div>
+    <a href="/admin">Admin</a>
+  </header>
+  <main id="chat"></main>
+  <div id="typing" class="typing hidden">SmartAssist is thinking…</div>
+  <form id="form">
+    <input id="message" autocomplete="off" placeholder="Ask a support question..." />
+    <button>Send</button>
+  </form>
+  <div class="feedback">
+    <button onclick="feedback('helpful')">👍 Helpful</button>
+    <button onclick="feedback('not helpful')">👎 Not helpful</button>
+  </div>
+</div>
+<script>
+let sessionId = localStorage.getItem("smartassist_session") || "";
+const chat = document.getElementById("chat");
+const form = document.getElementById("form");
+const input = document.getElementById("message");
+const typing = document.getElementById("typing");
+
+function add(role,text,meta=""){
+  const d=document.createElement("div");
+  d.className="bubble "+role;
+  d.innerHTML="<div>"+text.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")+"</div>"+(meta?`<small>${meta}</small>`:"");
+  chat.appendChild(d); chat.scrollTop=chat.scrollHeight;
+}
+add("assistant","Hi! I’m SmartAssist. Ask me anything about your account, billing, delivery, refunds, or technical support.");
+
+form.addEventListener("submit", async e=>{
+  e.preventDefault();
+  const message=input.value.trim(); if(!message)return;
+  add("user",message); input.value=""; typing.classList.remove("hidden");
+  try{
+    const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,session_id:sessionId})});
+    const data=await r.json(); sessionId=data.session_id; localStorage.setItem("smartassist_session",sessionId);
+    add("assistant",data.response,`Intent: ${data.intent}${data.escalate?" • Human handoff recommended":""}`);
+  }catch(err){ add("assistant","Sorry, the server could not process that request."); }
+  typing.classList.add("hidden");
+});
+async function feedback(rating){
+  if(!sessionId)return;
+  await fetch("/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:sessionId,rating})});
+  alert("Thanks for the feedback!");
+}
+</script>
+</body>
+</html>
